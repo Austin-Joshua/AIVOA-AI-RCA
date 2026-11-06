@@ -61,10 +61,14 @@ export const FiveWhysSection = () => {
         );
       }
     } catch (err) {
+      const errorMsg =
+        typeof err === 'string'
+          ? err
+          : err?.detail || err?.message || 'Failed to generate RCA package. Please verify deviation details.';
       dispatch(
         setNotification({
           type: 'error',
-          message: `Generation failed: ${err}`,
+          message: `Generation failed: ${errorMsg}`,
         })
       );
     } finally {
