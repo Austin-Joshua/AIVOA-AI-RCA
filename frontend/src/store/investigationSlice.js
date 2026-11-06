@@ -42,6 +42,18 @@ export const createInvestigation = createAsyncThunk(
   }
 );
 
+export const seedParacetamolDemo = createAsyncThunk(
+  'investigation/seedParacetamolDemo',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/investigations/seed-demo-scenario');
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.detail || 'Failed to seed demo scenario');
+    }
+  }
+);
+
 export const updateDeviation = createAsyncThunk(
   'investigation/updateDeviation',
   async ({ id, data }, { rejectWithValue }) => {
@@ -657,6 +669,13 @@ const investigationSlice = createSlice({
         state.currentInvestigation = action.payload;
         state.investigationsList.unshift(action.payload);
         state.activeStage = 'INTAKE';
+      })
+
+      // seedParacetamolDemo
+      .addCase(seedParacetamolDemo.fulfilled, (state, action) => {
+        state.currentInvestigation = action.payload;
+        state.investigationsList.unshift(action.payload);
+        state.activeStage = 'INVESTIGATION';
       })
 
       // updateDeviation

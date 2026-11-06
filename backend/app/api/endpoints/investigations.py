@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, verify_investigation_access
 from app.models.investigation import Investigation
 from app.models.deviation import Deviation
+from app.models.evidence import Evidence
 from app.models.five_whys import FiveWhysStep, FiveWhysEvidenceLink
 from app.models.fishbone import FishboneCause, FishboneEvidenceLink
 from app.models.root_cause import RootCause, RootCauseEvidenceLink
@@ -104,6 +105,94 @@ async def create_investigation(
     )
     
     # Return full investigation
+    return await get_investigation_by_id(new_inv.id, db)
+
+@router.post("/seed-demo-scenario", response_model=InvestigationRead)
+async def seed_demo_scenario(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Seeds a fully initialized, cGMP-ready Paracetamol API demo investigation
+    with deviation telemetry and verified evidence records for seamless presentation.
+    """
+    inv_number = f"INV-2026-{uuid.uuid4().hex[:6].upper()}"
+    new_inv = Investigation(
+        investigation_number=inv_number,
+        title="Temperature Excursion in Paracetamol API Crystallization (Batch API-2026-104)",
+        status="IN_INVESTIGATION",
+        stage="INVESTIGATION",
+        lead_investigator=current_user.full_name,
+        lead_investigator_id=current_user.id
+    )
+    db.add(new_inv)
+    await db.flush()
+
+    dev = Deviation(
+        investigation_id=new_inv.id,
+        deviation_number="DEV-2026-104",
+        deviation_number_source="SOURCE",
+        deviation_type="MAJOR",
+        severity="High",
+        batch_number="API-2026-104",
+        product_name="Paracetamol API (Acetaminophen Micronized USP)",
+        unit_operation="Crystallization",
+        equipment_id="CR-104",
+        bpr_number="BPR-PARA-2026-042",
+        occurrence_datetime=datetime.utcnow(),
+        detection_datetime=datetime.utcnow(),
+        description="During the secondary cooling crystallization cycle for Paracetamol API lot API-2026-104 in reactor CR-104, cooling control valve CV-104 failed to open beyond 15% due to a sudden drop in instrument pneumatic air pressure. Reactor temperature spiked to 86.4°C for 18 minutes, exceeding validated range of 75.0-80.0°C.",
+        immediate_containment="Batch cooled to 72.0°C via manual bypass cooling. Slurry isolated and quarantined in buffer vessel. Quality Assurance quarantine notices affixed.",
+        is_ai_populated=True,
+        is_verified=True
+    )
+    db.add(dev)
+
+    ev1 = Evidence(
+        investigation_id=new_inv.id,
+        title="SCADA Temperature Excursion Log (Reactor CR-104)",
+        original_filename="SCADA_CR104_Temp_Batch_104.pdf",
+        evidence_type="SCADA_TREND",
+        classification="SYSTEM_TELEMETRY",
+        source="DCS-HISTORIAN-TAG-TI104",
+        source_location="Historian Archive Batch API-2026-104",
+        extracted_text="CR-104 Temperature Historian Trace: 04:12:00 setpoint 78.0°C, actual 78.2°C; 04:14:30 temp 81.5°C (CRITICAL ALARM HIGH); 04:18:00 temp peak 86.4°C; 04:30:00 temp normalized to 78.1°C following emergency manual cooling water bypass engagement.",
+        confidence_score=1.0,
+        is_verified=True,
+        verified_by=current_user.full_name,
+        verified_by_user_id=current_user.id,
+        verification_date=datetime.utcnow(),
+        investigator_notes="Empirical process historian telemetry corroborating the 18-minute thermal excursion above 80.0°C."
+    )
+    db.add(ev1)
+
+    ev2 = Evidence(
+        investigation_id=new_inv.id,
+        title="Cooling Control Valve CV-104 Telemetry & Pressure Log",
+        original_filename="Maintenance_Valve_Actuator_CV104.pdf",
+        evidence_type="LOGBOOK",
+        classification="PRIMARY_SOURCE",
+        source="PNEUMATIC-SENSOR-PT104",
+        source_location="Valve Actuation Diagnostics Channel 2",
+        extracted_text="CV-104 Valve Diagnostics: Command signal 100% open delivered at 04:13:10. Actuator position feedback remained mechanically arrested at 14.8%. Upstream instrument air header pressure fell from nominal 6.0 bar to 2.1 bar due to a ruptured O-ring on pneumatic regulator PR-104.",
+        confidence_score=1.0,
+        is_verified=True,
+        verified_by=current_user.full_name,
+        verified_by_user_id=current_user.id,
+        verification_date=datetime.utcnow(),
+        investigator_notes="Direct mechanical evidence establishing that pneumatic pressure loss prevented CV-104 from actuating."
+    )
+    db.add(ev2)
+
+    await db.flush()
+
+    await audit_service.log_action(
+        db, new_inv.id, "CREATED", "INVESTIGATION",
+        f"Demo scenario initialized with deviation and verified evidence: '{new_inv.title}'",
+        user_name=current_user.full_name,
+        user_id=current_user.id
+    )
+
     return await get_investigation_by_id(new_inv.id, db)
 
 @router.get("/{investigation_id}", response_model=InvestigationRead)

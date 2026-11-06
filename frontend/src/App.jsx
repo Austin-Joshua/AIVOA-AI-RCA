@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchInvestigations, fetchInvestigationById, createInvestigation } from './store/investigationSlice';
+import { fetchInvestigations, fetchInvestigationById, seedParacetamolDemo } from './store/investigationSlice';
 import { fetchCurrentUser } from './store/authSlice';
 import { setShowNewModal } from './store/uiSlice';
 import { Sparkles, Plus, ShieldCheck, CheckCircle2, Cpu } from 'lucide-react';
@@ -67,14 +67,7 @@ export function App() {
   }, [dispatch, token]);
 
   const handleStartParacetamolDemo = async () => {
-    const res = await dispatch(
-      createInvestigation({
-        title: 'Temperature Excursion in Paracetamol API Crystallization (Batch API-2026-104)',
-        lead_investigator: currentUser?.full_name || 'Lead Investigator',
-        stage: 'INTAKE',
-        status: 'IN_INVESTIGATION',
-      })
-    );
+    const res = await dispatch(seedParacetamolDemo());
     if (res.payload?.id) {
       dispatch(fetchInvestigationById(res.payload.id));
     }
