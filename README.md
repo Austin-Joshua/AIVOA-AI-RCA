@@ -1,4 +1,5 @@
 # AIVOA.AI – RCA Intelligence Module
+
 ### AI-Assisted Root Cause Analysis (RCA) Decision-Support Prototype for Pharmaceutical API Manufacturing
 
 A specialized engineering decision-support prototype platform designed to assist pharmaceutical quality investigators and QA/QC teams during Root Cause Analysis (RCA) and Corrective & Preventive Action (CAPA) formulation for Active Pharmaceutical Ingredient (API) manufacturing deviations.
@@ -20,21 +21,73 @@ A specialized engineering decision-support prototype platform designed to assist
 
 ---
 
-## 2. Core Business Workflow
 
+## 2. End-to-End RCA Intelligence Architecture & Flow Diagram
+
+The following end-to-end flowchart illustrates how AIVOA.AI orchestrates multi-modal incident intake, security isolation, grounded AI inference, dual-engine causality analysis, human-in-the-loop verification, and independent QA approval:
+
+```mermaid
+flowchart TD
+    subgraph S1["Stage 1: Multi-Modal Incident Ingestion"]
+        A1["Digital Deviation PDF (PyMuPDF Structured Parser)"] --> B["Intake Normalizer & Nonce Delimiter Wrapper"]
+        A2["Manufacturing Alert Email (RFC 5322 Ingestion)"] --> B
+        A3["Pasted Incident Text (Direct SCADA Excursion Narrative)"] --> B
+    end
+
+    subgraph S2["AI Guard & Security Shield"]
+        B --> C{"AI Guard & Security Gateway"}
+        C -- "Prompt Injection or Jailbreak Attempt" --> R1["Fixed Refusal & Audit Trail Alert"]
+        C -- "Out of Scope Request" --> R2["Domain Boundary Refusal"]
+        C -- "Assistant Meta Query" --> R3["Deterministic Server Response (0 LLM Calls)"]
+        C -- "Valid Quality Incident" --> D["LangGraph StateGraph Router"]
+    end
+
+    subgraph S3["AI Copilot Orchestration & Grounding"]
+        D --> E["Groq High-Speed LLM Inference (llama-3.3-70b-versatile)"]
+        F[("PostgreSQL 16 Search Index (tsvector FTS & Evidence IDs)")] -->|"[S#] Grounded Evidence Snippets"| E
+        E --> G["Output Sanitizer & Integrity Canary Verification"]
+    end
+
+    subgraph S4["Stage 2: Evidence & Form Verification Gate"]
+        G --> H["Structured Deviation Form Draft (Batch, Reactor, Excursion Temp, Yield)"]
+        H --> I{"Human Investigator Review Gate"}
+        I -- "Conversational Field Correction" --> H
+        I -- "Investigator Confirms" --> J["Committed Investigation Dossier (SHA-256 Checksums)"]
+    end
+
+    subgraph S5["Stage 3: Dual Causality Investigation Engines"]
+        J --> K1["5-Whys Causal Cascade (Dynamic Depth Chain)"]
+        J --> K2["Ishikawa 6Ms Fishbone (Man, Machine, Material, Method, Measurement, Milieu)"]
+        K1 --> L["Evidence Gap Detection (Missing Calibration Logs, SOPs)"]
+        K2 --> L
+    end
+
+    subgraph S6["Stage 4: Root Cause Synthesis & CAPA Formulation"]
+        K1 & K2 --> M["Synthesized Root Cause Proposals (Locked to PROPOSED Status)"]
+        M --> N["CAPA Action Formulation (Immediate Containment, Corrective, Preventive)"]
+        N --> O["Effectiveness Verification Criteria & Assigned Owners"]
+    end
+
+    subgraph S7["Stage 5: Electronic Governance & Sign-Off Gate"]
+        O --> P{"Role-Based Separation of Duties Gate"}
+        P -- "Lead Investigator Sign-Off" --> Q1["Primary Investigator Attestation"]
+        Q1 --> Q2{"Independent QA Review Gate (Self-Approval Forbidden)"}
+        Q2 -- "QA Approver Sign-Off" --> R["Final Approved Investigation Dossier (ALCOA+ Immutable Audit Trail)"]
+    end
 ```
-Incident Intake (PDF / Email / Text)
-       ↓
-Automated AI Extraction & Grounded Citation Verification (Human Acceptance Gate)
-       ↓
-Investigation & Evidence Dossier (SHA-256 Checksums, Verification Separation of Duties)
-       ↓
-5 Whys Causality Cascade & Ishikawa 6Ms Fishbone Analysis (Evidence-Linked Barriers)
-       ↓
-Root Cause Proposal Synthesis (Locked to PROPOSED; Provenance Serialization via Row Locks)
-       ↓
-Human Review, Editing & QA Independent Sign-Off (Role-Enforced; Separation of Duties)
-```
+
+
+### Stage-by-Stage Operational Overview
+
+| Stage | Operational Domain | Key Technical Mechanisms & Regulatory Controls |
+|---|---|---|
+| **1. Multi-Modal Ingestion** | Intake & Telemetry | Multi-format parser (PDF, RFC 5322 email, text). Verbatim continuous text extraction, SHA-256 fingerprinting, and random nonced untrusted delimiters. |
+| **2. AI Guard & Intent Gateway** | Security & Defense | Zero-trust input hygiene, injection & canary leak detectors, deterministic META routing (0 LLM calls), ambiguity policy, and token budget throttling. |
+| **3. Grounded AI Orchestration** | LangGraph & Groq | 13-node compiled StateGraph. Context retrieval via PostgreSQL 16 full-text search (`tsvector` + GIN) with mandatory `[S#]` source tags and zero synthetic hallucination fallback. |
+| **4. Human-in-the-Loop Intake Gate** | Deviation Form | Multi-parameter draft mapping (Batch, Equipment, Severity, Containment). Status lifecycle tracking: `AI Populated (Pending Verification)` vs `Investigator Verified`. |
+| **5. Dual Causality Engines** | 5-Whys & 6M Fishbone | Dynamic depth causality trees and 6M Ishikawa decomposition (Man, Machine, Material, Method, Measurement, Milieu). Cross-referenced against missing empirical evidence gaps. |
+| **6. Root Cause & CAPA Synthesis** | Risk & Prevention | Primary causes and contributing factors initialized strictly as `PROPOSED`. CAPA formulation covering immediate containment, corrective actions, and preventive measures with accountable owners. |
+| **7. Electronic Governance Gate** | QA Review & Audit | Separation of Duties enforcement: Lead investigator cannot self-approve. QA independent review gate with electronic signatures and immutable ALCOA+ audit trail logging. |
 
 ---
 
@@ -120,7 +173,7 @@ Both `.env` files are git-ignored. Template files are provided at `.env.example`
 All values below are descriptive placeholders. **Never commit real secrets or credentials.**
 
 | Variable | Scope | Description | Default / Example Placeholder | Required |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `POSTGRES_SERVER` | Backend & Docker | PostgreSQL hostname or container address | `127.0.0.1` | Yes |
 | `POSTGRES_PORT` | Backend & Docker | PostgreSQL listening port | `5432` | Yes |
 | `POSTGRES_DB` | Backend & Docker | PostgreSQL database catalog name | `aivoa_rca` | Yes |
@@ -131,7 +184,7 @@ All values below are descriptive placeholders. **Never commit real secrets or cr
 | `GROQ_API_KEY` | Backend | Primary Groq API key for LLM inference | `gsk_...` | Optional (offline fallback) |
 | `GROQ_PROJECT_ID` | Backend | Primary Groq project ID for quota isolation | `<groq_project_id>` | Optional |
 | `GROQ_BACKUP_API_KEY` | Backend | Backup Groq API key for project-isolated failover | `gsk_...` | Optional |
-| `GROQ_BACKUP_PROJECT_ID`| Backend | Backup Groq project ID for quota isolation | `<backup_groq_project_id>` | Optional |
+| `GROQ_BACKUP_PROJECT_ID` | Backend | Backup Groq project ID for quota isolation | `<backup_groq_project_id>` | Optional |
 | `ENVIRONMENT` | Backend | Runtime profile (`development`, `test`, `production`) | `development` | Yes |
 | `ALLOW_DEMO_SEEDING` | Backend | Enable development demo user provisioning | `True` | No |
 | `DEMO_ACCOUNT_PASSWORD` | Backend | Development-only initial demo password | `<dev_demo_password>` | No (dev/test only) |
@@ -140,7 +193,9 @@ All values below are descriptive placeholders. **Never commit real secrets or cr
 ---
 
 ### Verification and Database Migration Management
+
 Alembic migrations are the authoritative schema management mechanism. Normal application startup does not execute schema DDL or silent migrations. Apply migrations from a clean database:
+
 ```bash
 # Verify current migration revision matches head:
 python -m alembic -c backend/alembic.ini current
@@ -148,6 +203,7 @@ python -m alembic -c backend/alembic.ini current
 ```
 
 ### 3. Setup & Start Backend
+
 ```bash
 # From repository root:
 python -m venv .venv
@@ -164,17 +220,21 @@ pip install -r backend/requirements.txt
 # Start backend server
 python backend/run.py
 ```
+
 Backend starts on `http://127.0.0.1:8000` (API documentation at `http://127.0.0.1:8000/docs`).
 
 ### 4. Setup & Start Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
 Frontend development server starts on `http://127.0.0.1:5173`.
 
 ### 5. Production Build & Deployment Notes
+
 - **Docker Compose**: Running `docker compose up` validates that required variables (`POSTGRES_PASSWORD`, `SECRET_KEY`) are present, failing immediately with descriptive errors if absent.
 - **Production Secrets**: In `ENVIRONMENT=production`, default development passwords (`aivoa_password`), SQLite URLs, and placeholder secrets trigger immediate fail-fast exceptions.
 - **Demo Account Isolation**: Demonstration accounts and shortcuts are strictly disabled in production (`import.meta.env.PROD` and backend `allows_demo_seeding = False`). Passwords are never embedded in frontend code.
@@ -189,9 +249,11 @@ The test suite validates database persistence, Alembic migrations, document extr
 # Execute deterministic test suite (164 automated tests; live external provider calls deselected):
 pytest backend/tests -m "not live_provider" -v
 ```
+
 *(All 171 automated tests pass against live PostgreSQL 16 with 0 warnings)*
 
 To run opt-in live Groq inference tests (requires active API key with available quota):
+
 ```bash
 pytest backend/tests -m "live_provider" -v
 ```
@@ -201,6 +263,7 @@ pytest backend/tests -m "live_provider" -v
 ## 6. Sample Intake Files
 
 Realistic pharmaceutical deviation test files are located in `examples/`:
+
 - `examples/sample_deviation_report.pdf`: Multi-section formatted PDF deviation report for Atorvastatin batch B2026-API-044.
 - `examples/sample_deviation_report.txt`: Plaintext incident report.
 - `examples/sample_incident_email.txt`: Email notification format.

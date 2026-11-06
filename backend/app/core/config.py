@@ -71,12 +71,23 @@ class Settings(BaseSettings):
 
     # Demo Account Provisioning (Controlled via explicit flag; strictly disabled in production)
     ENABLE_DEMO_PROVISIONING: bool = os.getenv("ENABLE_DEMO_PROVISIONING", "true").lower() in ("true", "1", "yes")
+    ALLOW_DEMO_LOGIN: bool = os.getenv("ALLOW_DEMO_LOGIN", "false").lower() in ("true", "1", "yes")
 
     @property
     def allows_demo_seeding(self) -> bool:
         if self.is_production:
             return False
         return self.ENABLE_DEMO_PROVISIONING and self.ENVIRONMENT.lower() in ("development", "test")
+
+    @property
+    def demo_login_allowed(self) -> bool:
+        if self.is_production:
+            return False
+        return self.ALLOW_DEMO_LOGIN and self.ENVIRONMENT.lower() != "production"
+
+    # AI Request Rate Limiting
+    AI_RATE_LIMIT_PER_MINUTE: int = int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "20"))
+    AI_RATE_LIMIT_PER_HOUR: int = int(os.getenv("AI_RATE_LIMIT_PER_HOUR", "200"))
 
     # Initial Admin Provisioning (Used solely for initial bootstrap; never hardcoded in production)
     INITIAL_ADMIN_USERNAME: Optional[str] = os.getenv("INITIAL_ADMIN_USERNAME", None)

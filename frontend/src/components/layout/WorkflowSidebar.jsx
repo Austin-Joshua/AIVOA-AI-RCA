@@ -126,7 +126,6 @@ export const WorkflowSidebar = () => {
         <div className="absolute left-[19px] top-3 bottom-3 w-[2px] bg-slate-200 dark:bg-[#1e2236] z-0 pointer-events-none" />
 
         {STAGES.map((stage, idx) => {
-          const Icon = stage.icon;
           const isActive = activeStage === stage.id;
           const isCompleted = activeIndex > idx || (idx === 4 && currentInvestigation?.is_approved);
 

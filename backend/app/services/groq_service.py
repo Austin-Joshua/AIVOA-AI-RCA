@@ -206,9 +206,8 @@ class GroqService:
     def _resolve_model(self):
         """Ensures the selected model is accessible or selects the top supported model for this Groq key."""
         candidates = [
-            "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b",
             "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
             "llama-3.3-70b-versatile"
         ]
         if not self.client:
@@ -226,9 +225,9 @@ class GroqService:
 
             prev_model = self.model
             verified_candidates = [
+                "openai/gpt-oss-120b",
                 "openai/gpt-oss-20b",
-                "qwen/qwen3.8-27b",
-                "openai/gpt-oss-120b"
+                "llama-3.3-70b-versatile"
             ]
             for candidate in verified_candidates:
                 if candidate in available_models:
@@ -261,7 +260,7 @@ class GroqService:
 
         available = self.get_available_models()
         models_to_try = [self.model]
-        candidates = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+        candidates = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"]
         for c in candidates:
             if c != self.model and (not available or c in available):
                 models_to_try.append(c)
@@ -272,7 +271,7 @@ class GroqService:
             for attempt in range(2):
                 for current_model in models_to_try:
                     try:
-                        max_out = 950 if "qwen" in current_model.lower() else 3500
+                        max_out = 3500
                         llm = ChatGroq(
                             groq_api_key=key_to_use,
                             model_name=current_model,
@@ -841,7 +840,7 @@ Generate a complete RCA and CAPA package in JSON matching this schema:
                 logger.warning("Canary or system prompt leak detected in model output! Returning fixed refusal.")
                 return FIXED_REFUSAL
 
-            return sanitize_chat_reply(raw_content)
+            return sanitize_chat_reply(raw_content, retrieved_sources=sources)
 
         try:
             return _execute_chat(primary_key)

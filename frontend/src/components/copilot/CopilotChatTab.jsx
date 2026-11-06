@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   FileText,
   Flame,
+  Clock,
 } from 'lucide-react';
 import {
   converseWithCopilot,
@@ -18,6 +19,8 @@ import {
   setHighlightedFieldKey,
   setActiveTab,
   generateRcaPackage,
+  clearRateLimit,
+  clearConcurrencyError,
 } from '../../store/copilotSlice';
 import { saveInvestigationDeviation } from '../../store/investigationSlice';
 import { setNotification } from '../../store/uiSlice';
@@ -26,12 +29,31 @@ import api from '../../services/api';
 export const CopilotChatTab = () => {
   const dispatch = useDispatch();
   const currentInvestigation = useSelector((state) => state.investigation.currentInvestigation);
-  const { chatMessages, isChatting } = useSelector((state) => state.copilot);
+  const { chatMessages, isChatting, rateLimitUntil, concurrencyError } = useSelector((state) => state.copilot);
 
   const [inputMessage, setInputMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(() => {
+    return rateLimitUntil ? Math.max(0, Math.ceil((rateLimitUntil - Date.now()) / 1000)) : 0;
+  });
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Rate limit cooldown timer
+  useEffect(() => {
+    if (!rateLimitUntil) return;
+    const updateCountdown = () => {
+      const diff = Math.ceil((rateLimitUntil - Date.now()) / 1000);
+      if (diff <= 0) {
+        setSecondsRemaining(0);
+        dispatch(clearRateLimit());
+      } else {
+        setSecondsRemaining(diff);
+      }
+    };
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [rateLimitUntil, dispatch]);
 
   // Load persisted chat history for this investigation
   useEffect(() => {
@@ -322,6 +344,35 @@ Immediate containment:
 
       {/* Input Composer & Document Drop */}
       <div className="shrink-0 pt-3 border-t border-slate-200 dark:border-[#1e2236] bg-white dark:bg-[#060814]">
+        {/* Rate limit countdown banner */}
+        {secondsRemaining > 0 && (
+          <div className="mb-2.5 p-2 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex items-center justify-between font-mono animate-pulse">
+            <span className="flex items-center gap-1.5 font-bold">
+              <Clock className="w-3.5 h-3.5" />
+              Rate limit cooldown: Too many AI requests.
+            </span>
+            <span className="font-extrabold px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-[11px]">
+              Retry in {secondsRemaining}s
+            </span>
+          </div>
+        )}
+
+        {/* Concurrency lock alert */}
+        {concurrencyError && (
+          <div className="mb-2.5 p-2 px-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-800 dark:text-blue-300 text-xs flex items-center justify-between font-mono">
+            <span className="flex items-center gap-1.5 font-bold">
+              <AlertTriangle className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              {concurrencyError}
+            </span>
+            <button
+              onClick={() => dispatch(clearConcurrencyError())}
+              className="text-[10px] uppercase font-bold underline cursor-pointer text-blue-700 dark:text-blue-400 hover:opacity-80"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 mb-2">
           <input
             type="file"
@@ -333,8 +384,8 @@ Immediate containment:
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading || isChatting}
-            className="skeuo-btn-secondary p-1.5 px-2.5 rounded-xl transition flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer"
+            disabled={isUploading || isChatting || secondsRemaining > 0}
+            className="skeuo-btn-secondary p-1.5 px-2.5 rounded-xl transition flex items-center gap-1.5 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
             title="Attach deviation PDF, email or text file"
           >
             <Paperclip className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
@@ -354,21 +405,31 @@ Immediate containment:
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSend();
+                  if (secondsRemaining <= 0) handleSend();
                 }
               }}
-              placeholder="Type incident report, correction statement, or ask Copilot..."
-              className="w-full text-xs p-3 bg-transparent text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none resize-none font-sans"
+              placeholder={secondsRemaining > 0 ? `Rate limit cooldown active (${secondsRemaining}s)...` : "Type incident report, correction statement, or ask Copilot..."}
+              disabled={secondsRemaining > 0}
+              className="w-full text-xs p-3 bg-transparent text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none resize-none font-sans disabled:opacity-60"
             />
           </div>
           <button
             onClick={() => handleSend()}
-            disabled={!inputMessage.trim() || isChatting}
-            className="skeuo-btn-primary px-4 py-2 rounded-xl transition flex flex-col items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-            title="Send to Copilot"
+            disabled={!inputMessage.trim() || isChatting || secondsRemaining > 0}
+            className="skeuo-btn-primary px-4 py-2 rounded-xl transition flex flex-col items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[64px]"
+            title={secondsRemaining > 0 ? `Please wait ${secondsRemaining}s` : "Send to Copilot"}
           >
-            <Send className="w-4 h-4" />
-            <span className="text-[9px] mt-0.5 font-bold uppercase font-mono">Send</span>
+            {secondsRemaining > 0 ? (
+              <>
+                <Clock className="w-4 h-4 text-amber-300 animate-spin" />
+                <span className="text-[9px] mt-0.5 font-bold uppercase font-mono">{secondsRemaining}s</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span className="text-[9px] mt-0.5 font-bold uppercase font-mono">Send</span>
+              </>
+            )}
           </button>
         </div>
       </div>

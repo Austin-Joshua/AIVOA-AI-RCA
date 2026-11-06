@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Lock, User, X, LogIn, AlertCircle, Sparkles, Eye, EyeOff } from 'lucide-react';
-import { loginUser } from '../../store/authSlice';
+import { Lock, User, X, LogIn, AlertCircle, Sparkles, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { loginUser, demoLoginUser } from '../../store/authSlice';
 import { setShowLoginModal, setNotification } from '../../store/uiSlice';
 import { fetchInvestigations, fetchInvestigationById } from '../../store/investigationSlice';
 import { Button, Input } from '../ui';
+import api from '../../services/api';
 
 export const LoginModal = () => {
   const dispatch = useDispatch();
@@ -15,6 +16,25 @@ export const LoginModal = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [demoLoginEnabled, setDemoLoginEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (showLoginModal) {
+      api.get('/auth/config')
+        .then((res) => {
+          if (isMounted && res.data?.demo_login_enabled) {
+            setDemoLoginEnabled(true);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setDemoLoginEnabled(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [showLoginModal]);
 
   if (!showLoginModal) return null;
 
@@ -51,10 +71,26 @@ export const LoginModal = () => {
     }
   };
 
-  const handleSelectPersona = (u, p) => {
-    setUsername(u);
-    setPassword(p);
+  const handleDemoLogin = async (persona) => {
     setLocalError('');
+    const res = await dispatch(demoLoginUser({ persona }));
+    if (!res.error) {
+      dispatch(setShowLoginModal(false));
+      setUsername('');
+      setPassword('');
+      dispatch(
+        setNotification({
+          type: 'success',
+          message: `Authenticated as ${res.payload.user.full_name} (${res.payload.user.role})`,
+        })
+      );
+      const invAction = await dispatch(fetchInvestigations());
+      if (invAction.payload && invAction.payload.length > 0) {
+        dispatch(fetchInvestigationById(invAction.payload[0].id));
+      }
+    } else {
+      setLocalError(res.payload || 'Demo login failed.');
+    }
   };
 
   return (
@@ -86,31 +122,41 @@ export const LoginModal = () => {
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Quick Persona Selector */}
-          <div className="p-3 rounded-2xl bg-blue-50/50 dark:bg-[#0c0e1a] border border-blue-200 dark:border-[#1e2236]">
-            <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 tracking-wider mb-2 flex items-center gap-1 font-mono">
-              <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-              Quick Select Test Credentials:
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleSelectPersona('lead_investigator', 'AivoaPass2026!')}
-                className="skeuo-btn-secondary text-left p-2 rounded-xl text-xs flex flex-col transition border border-blue-200 dark:border-[#1e2236] hover:border-blue-400"
-              >
-                <span className="font-bold text-slate-900 dark:text-slate-100 text-[11px]">Dr. Sarah Lin</span>
-                <span className="text-[10px] text-blue-800 dark:text-blue-300 font-mono font-bold">Lead Investigator</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPersona('qa_director', 'AivoaPass2026!')}
-                className="skeuo-btn-secondary text-left p-2 rounded-xl text-xs flex flex-col transition border border-amber-200 dark:border-[#1e2236] hover:border-amber-400"
-              >
-                <span className="font-bold text-slate-900 dark:text-slate-100 text-[11px]">Dr. Elena Rostova</span>
-                <span className="text-[10px] text-amber-800 dark:text-amber-300 font-mono font-bold">QA Director</span>
-              </button>
+          {/* Quick Demo Shortcuts (Only shown when demo login is enabled) */}
+          {demoLoginEnabled && (
+            <div className="p-3 rounded-2xl bg-blue-50/50 dark:bg-[#0c0e1a] border border-blue-200 dark:border-[#1e2236]">
+              <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 tracking-wider mb-2 flex items-center gap-1 font-mono">
+                <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                Recording / Demo Shortcuts:
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('investigator')}
+                  disabled={status === 'loading'}
+                  className="skeuo-btn-secondary text-left p-2 rounded-xl text-xs flex flex-col transition border border-blue-200 dark:border-[#1e2236] hover:border-blue-400 cursor-pointer disabled:opacity-50"
+                >
+                  <span className="font-bold text-slate-900 dark:text-slate-100 text-[11px] flex items-center justify-between">
+                    Demo Investigator
+                    <ArrowRight className="w-3 h-3 text-blue-700 dark:text-blue-400" />
+                  </span>
+                  <span className="text-[10px] text-blue-800 dark:text-blue-300 font-mono font-bold">Role: INVESTIGATOR</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('qa')}
+                  disabled={status === 'loading'}
+                  className="skeuo-btn-secondary text-left p-2 rounded-xl text-xs flex flex-col transition border border-amber-200 dark:border-[#1e2236] hover:border-amber-400 cursor-pointer disabled:opacity-50"
+                >
+                  <span className="font-bold text-slate-900 dark:text-slate-100 text-[11px] flex items-center justify-between">
+                    Demo QA Reviewer
+                    <ArrowRight className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                  </span>
+                  <span className="text-[10px] text-amber-800 dark:text-amber-300 font-mono font-bold">Role: QA_APPROVER</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {localError && (
             <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-rose-700 dark:text-rose-200 text-xs font-medium">

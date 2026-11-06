@@ -43,6 +43,8 @@ from app.services.groq_service import (
     sanitize_secret,
 )
 from app.services.audit_service import audit_service
+from app.services.rate_limiter import ai_rate_limiter, investigation_concurrency_limiter
+from app.services.token_budget import estimate_tokens, TokenBudgetManager
 from app.services.document_parser import document_parser
 from app.api.endpoints.investigations import get_investigation_by_id
 from app.services.ai_guard import (
@@ -55,6 +57,13 @@ from app.services.ai_guard import (
     log_guard_blocked_audit,
     check_canary_leak,
     check_system_prompt_leak,
+    sanitize_chat_reply,
+    classify_meta_intent,
+    get_meta_response,
+    is_ambiguous_model_query,
+    is_equipment_model_query,
+    is_external_search_request,
+    sync_investigation_search_index,
     FIXED_REFUSAL,
 )
 
@@ -75,6 +84,13 @@ async def copilot_converse(
     await verify_investigation_access(req.investigation_id, current_user, db, require_write=True)
     inv = await get_investigation_by_id(req.investigation_id, db)
 
+    # Per-user rate limit check
+    await ai_rate_limiter.check_rate_limit(current_user.id)
+
+    async with investigation_concurrency_limiter.acquire(inv.id):
+        return await _execute_copilot_converse(inv, req, current_user, db)
+
+async def _execute_copilot_converse(inv, req: CopilotConverseRequest, current_user: User, db: AsyncSession):
     # 0. Input hygiene, length bounds, and attack validation
     clean_message = normalize_text(req.message)
     if not clean_message:
@@ -132,7 +148,7 @@ async def copilot_converse(
                 field_patches=[],
                 risk_assessment=None,
                 missing_fields=[],
-                suggested_actions=["Review Investigation Evidence", "Check Evidence Gaps"]
+                suggested_actions=[]
             )
 
     if is_strictly_out_of_domain(clean_message):
@@ -157,8 +173,81 @@ async def copilot_converse(
             field_patches=[],
             risk_assessment=None,
             missing_fields=[],
-            suggested_actions=["Review Investigation Evidence", "Check Evidence Gaps"]
+            suggested_actions=[]
         )
+
+    # 0a. Refusal for external online search requests (item 4 & 8)
+    if is_external_search_request(clean_message):
+        ext_refusal = (
+            "I cannot search the internet or query external databases. "
+            "I can only analyze evidence and data recorded within this investigation. "
+            "If you provide the manufacturer specifications or documentation, I can record them in the investigation dossier."
+        )
+        db.add(CopilotMessage(investigation_id=inv.id, user_id=current_user.id, role="user", content=clean_message, message_type="TEXT"))
+        db.add(CopilotMessage(investigation_id=inv.id, user_id=None, role="assistant", content=ext_refusal, message_type="TEXT"))
+        await db.commit()
+        return CopilotConverseResponse(
+            reply_text=ext_refusal,
+            classification="QUESTION",
+            field_patches=[],
+            risk_assessment=None,
+            missing_fields=[],
+            suggested_actions=[]
+        )
+
+    # 0b. Deterministic META questions answered from server facts (0 LLM calls, item 2 & 8)
+    meta_intent = classify_meta_intent(clean_message)
+    if meta_intent:
+        meta_reply = get_meta_response(meta_intent, groq_service.model)
+        db.add(CopilotMessage(investigation_id=inv.id, user_id=current_user.id, role="user", content=clean_message, message_type="TEXT"))
+        db.add(CopilotMessage(investigation_id=inv.id, user_id=None, role="assistant", content=meta_reply, message_type="TEXT"))
+        await db.commit()
+        return CopilotConverseResponse(
+            reply_text=meta_reply,
+            classification="META",
+            field_patches=[],
+            risk_assessment=None,
+            missing_fields=[],
+            suggested_actions=[]
+        )
+
+    # 0c. Ambiguity policy: AI model vs equipment model when retrieval finds no sources (item 3)
+    if is_ambiguous_model_query(clean_message):
+        retrieved_ambig = await retrieve_context(db, inv.id, clean_message, budget_tokens=500)
+        if len(retrieved_ambig) == 0:
+            clarify_reply = "Do you mean the AI model I'm running on, or an equipment model in this investigation?"
+            db.add(CopilotMessage(investigation_id=inv.id, user_id=current_user.id, role="user", content=clean_message, message_type="TEXT"))
+            db.add(CopilotMessage(investigation_id=inv.id, user_id=None, role="assistant", content=clarify_reply, message_type="TEXT"))
+            await db.commit()
+            return CopilotConverseResponse(
+                reply_text=clarify_reply,
+                classification="QUESTION",
+                field_patches=[],
+                risk_assessment=None,
+                missing_fields=[],
+                suggested_actions=[]
+            )
+
+    # 0d. Equipment model query when retrieval finds no sources (item 3 & 8)
+    if is_equipment_model_query(clean_message):
+        retrieved_equip = await retrieve_context(db, inv.id, clean_message, budget_tokens=500)
+        if len(retrieved_equip) == 0:
+            equip_reply = (
+                "That isn't in the current investigation record. "
+                "The equipment model would typically be documented in the equipment qualification (IQ/OQ) record or asset registry. "
+                "If you provide it, I can record it in the investigation dossier."
+            )
+            db.add(CopilotMessage(investigation_id=inv.id, user_id=current_user.id, role="user", content=clean_message, message_type="TEXT"))
+            db.add(CopilotMessage(investigation_id=inv.id, user_id=None, role="assistant", content=equip_reply, message_type="TEXT"))
+            await db.commit()
+            return CopilotConverseResponse(
+                reply_text=equip_reply,
+                classification="QUESTION",
+                field_patches=[],
+                risk_assessment=None,
+                missing_fields=[],
+                suggested_actions=[]
+            )
 
     # 1. Fetch conversation history for context
     history_res = await db.execute(
@@ -342,12 +431,26 @@ async def copilot_converse(
                 elif isinstance(m, MissingInfoItem):
                     missing_fields.append(m)
 
+            # Ingest incident narrative into Evidence and sync search index so conversational questions are immediately grounded
+            if not req.attached_document_id and len(doc_to_analyze.strip()) > 50:
+                ev_entry = Evidence(
+                    investigation_id=inv.id,
+                    title=f"Incident Ingestion - Batch {batch_no}",
+                    evidence_type="INCIDENT_REPORT",
+                    source="Copilot Chat Intake",
+                    source_location="Direct Report",
+                    extracted_text=doc_to_analyze
+                )
+                db.add(ev_entry)
+                await db.flush()
+                await sync_investigation_search_index(db, inv.id)
+
             reply_text = (
                 f"I've analyzed the incident details and populated the deviation draft fields "
                 f"with source citations. Batch {batch_no} is identified with {sev_val} severity. "
                 f"Please review the extracted values on the form. You can confirm them or type corrections."
             )
-            suggested_actions = ["Review Draft Fields", "Commit Form to Investigation", "Check Evidence Gaps"]
+            suggested_actions = ["Review Draft Fields", "Commit Form to Investigation"]
 
         elif classification == "CORRECTION":
             corrections = groq_service.extract_corrections_patch(
@@ -380,17 +483,39 @@ async def copilot_converse(
                 "I am ready to conduct root cause analysis. You can trigger the 5-Whys causal chain "
                 "or 6M Fishbone decomposition using the actions below, or open the RCA Engine tab."
             )
-            suggested_actions = ["Generate 5-Whys Analysis", "Generate 6M Fishbone Analysis", "Draft CAPA Package", "Run Full RCA Engine"]
+            msg_lower = clean_message.lower()
+            if "5" in msg_lower or "why" in msg_lower:
+                suggested_actions = ["Generate 5-Whys Analysis"]
+            elif "fishbone" in msg_lower or "6m" in msg_lower or "cause" in msg_lower:
+                suggested_actions = ["Generate 6M Fishbone Analysis"]
+            elif "capa" in msg_lower:
+                suggested_actions = ["Draft CAPA Package"]
+            else:
+                suggested_actions = ["Run Full RCA Engine"]
 
         else: # QUESTION
-            conv_history = [{"role": m.role, "content": m.content} for m in history_msgs[-6:]]
+            conv_history = [{"role": m.role, "content": m.content} for m in history_msgs]
             retrieved_sources = await retrieve_context(db, inv.id, clean_message, budget_tokens=1000)
+            sources_combined = "\n\n".join([
+                f"{s['source_tag']} (Source: {s.get('source_type')}, Evidence ID: {s.get('evidence_id')}, Page: {s.get('page')}):\n{s.get('snippet')}"
+                for s in retrieved_sources
+            ])
+            payload_prep = TokenBudgetManager.prepare_chat_payload(
+                model_name=groq_service.model,
+                system_prompt="AI RCA Copilot system instructions",
+                sources_text=sources_combined,
+                history=conv_history,
+                user_message=clean_message
+            )
             reply_text = groq_service.chat_copilot(
-                conversation_history=conv_history,
+                conversation_history=payload_prep["history"],
                 current_state=current_state,
                 user_message=clean_message,
                 sources=retrieved_sources
             )
+            if payload_prep["sources_truncated"]:
+                reply_text += "\n\n*Note: Source context was truncated to fit within model token budget.*"
+
             if check_canary_leak(reply_text) or check_system_prompt_leak(reply_text):
                 await log_guard_blocked_audit(
                     db=db,
@@ -401,7 +526,15 @@ async def copilot_converse(
                     raw_input=clean_message
                 )
                 reply_text = FIXED_REFUSAL
-            suggested_actions = ["Run Full RCA Engine", "Check Evidence Gaps", "Draft CAPA Recommendations"]
+
+            # Sanitize reply with grounded sources (Item 4 & 5)
+            reply_text = sanitize_chat_reply(reply_text, retrieved_sources=retrieved_sources)
+
+            # Suggested actions by intent: pure QUESTION gets none unless gap exposed (Item 6)
+            if any(p in reply_text.lower() for p in ["not in the current investigation record", "not in the available evidence", "missing", "gap", "logbook", "iq/oq"]):
+                suggested_actions = ["Check Evidence Gaps"]
+            else:
+                suggested_actions = []
 
     except GroqRateLimitError as e:
         logger.warning(f"Copilot converse rate limit: {sanitize_secret(str(e))}")
@@ -468,6 +601,19 @@ async def copilot_converse(
     db.add(asst_msg)
     await db.flush()
 
+    # Record AI interaction row with token tracking
+    in_tokens = estimate_tokens(req.message) + estimate_tokens(str(current_state))
+    out_tokens = estimate_tokens(reply_text)
+    ai_record = AiInteraction(
+        investigation_id=inv.id,
+        interaction_type=f"COPILOT_{classification}",
+        prompt_summary=req.message[:200],
+        response_data=reply_text[:500],
+        model_name=groq_service.model,
+        tokens_used=in_tokens + out_tokens
+    )
+    db.add(ai_record)
+
     # 6. Audit trail
     await audit_service.log_action(
         db, inv.id, "COPILOT_CONVERSE", inv.stage,
@@ -514,7 +660,14 @@ async def copilot_chat(
     """
     await verify_investigation_access(req.investigation_id, current_user, db)
     inv = await get_investigation_by_id(req.investigation_id, db)
-    
+
+    # Per-user rate limit check
+    await ai_rate_limiter.check_rate_limit(current_user.id)
+
+    async with investigation_concurrency_limiter.acquire(inv.id):
+        return await _execute_copilot_chat(inv, req, current_user, db)
+
+async def _execute_copilot_chat(inv, req: CopilotChatRequest, current_user: User, db: AsyncSession):
     current_state = {
         "investigation_number": inv.investigation_number,
         "title": inv.title,
@@ -548,16 +701,62 @@ async def copilot_chat(
         if set(inj["categories"]).intersection({"PROMPT_EXTRACTION", "JAILBREAK_DAN", "INSTRUCTION_OVERRIDE", "DATA_SMUGGLING", "MULTILINGUAL_INJECTION", "DELIMITER_SPOOFING"}):
             return CopilotChatResponse(
                 response=FIXED_REFUSAL,
-                suggested_actions=["Review Investigation Evidence", "Check Evidence Gaps"],
+                suggested_actions=[],
                 workflow_state=current_state
             )
 
     if is_strictly_out_of_domain(clean_message):
         return CopilotChatResponse(
             response=FIXED_REFUSAL,
-            suggested_actions=["Review Investigation Evidence", "Check Evidence Gaps"],
+            suggested_actions=[],
             workflow_state=current_state
         )
+
+    # 1. External search refusal
+    if is_external_search_request(clean_message):
+        return CopilotChatResponse(
+            response=(
+                "I cannot search the internet or query external databases. "
+                "I can only analyze evidence and data recorded within this investigation. "
+                "If you provide the manufacturer specifications or documentation, I can record them in the investigation dossier."
+            ),
+            suggested_actions=[],
+            workflow_state=current_state
+        )
+
+    # 2. Deterministic META questions (0 LLM calls)
+    meta_intent = classify_meta_intent(clean_message)
+    if meta_intent:
+        meta_reply = get_meta_response(meta_intent, groq_service.model)
+        return CopilotChatResponse(
+            response=meta_reply,
+            suggested_actions=[],
+            workflow_state=current_state
+        )
+
+    # 3. Ambiguity policy: AI model vs equipment model
+    if is_ambiguous_model_query(clean_message):
+        retrieved_ambig = await retrieve_context(db, inv.id, clean_message, budget_tokens=500)
+        if len(retrieved_ambig) == 0:
+            return CopilotChatResponse(
+                response="Do you mean the AI model I'm running on, or an equipment model in this investigation?",
+                suggested_actions=[],
+                workflow_state=current_state
+            )
+
+    # 4. Equipment model query with no sources
+    if is_equipment_model_query(clean_message):
+        retrieved_equip = await retrieve_context(db, inv.id, clean_message, budget_tokens=500)
+        if len(retrieved_equip) == 0:
+            return CopilotChatResponse(
+                response=(
+                    "That isn't in the current investigation record. "
+                    "The equipment model would typically be documented in the equipment qualification (IQ/OQ) record or asset registry. "
+                    "If you provide it, I can record it in the investigation dossier."
+                ),
+                suggested_actions=[],
+                workflow_state=current_state
+            )
 
     retrieved_sources = await retrieve_context(db, inv.id, clean_message, budget_tokens=1000)
 
@@ -578,6 +777,9 @@ async def copilot_chat(
                 raw_input=clean_message
             )
             ai_reply = FIXED_REFUSAL
+
+        # Sanitize reply with grounded sources (Item 4 & 5)
+        ai_reply = sanitize_chat_reply(ai_reply, retrieved_sources=retrieved_sources)
     except GroqRateLimitError as e:
         logger.warning(f"Copilot chat rate limit: {sanitize_secret(str(e))}")
         raise HTTPException(
@@ -615,23 +817,28 @@ async def copilot_chat(
             detail=f"An unexpected error occurred during Copilot chat: {sanitize_secret(str(e))}"
         )
 
+    # Suggested actions by intent: pure QUESTION gets none unless gap exposed (Item 6)
     suggested_actions = []
-    if "5" in req.message.lower() or "why" in req.message.lower():
+    msg_l = req.message.lower()
+    if "5" in msg_l or "why" in msg_l:
         suggested_actions.append("Generate 5-Whys Analysis")
-    if "fishbone" in req.message.lower() or "cause" in req.message.lower():
+    elif "fishbone" in msg_l or "cause" in msg_l:
         suggested_actions.append("Generate 6M Fishbone Analysis")
-    if "capa" in req.message.lower():
+    elif "capa" in msg_l:
         suggested_actions.append("Draft CAPA Package")
-    if not suggested_actions:
-        suggested_actions = ["Run Full RCA Engine", "Check Evidence Gaps", "Draft CAPA Recommendations"]
+    elif any(p in ai_reply.lower() for p in ["not in the current investigation record", "not in the available evidence", "missing", "gap", "logbook", "iq/oq"]):
+        suggested_actions.append("Check Evidence Gaps")
 
     # Record AI interaction
+    in_tokens = estimate_tokens(clean_message) + estimate_tokens(str(current_state))
+    out_tokens = estimate_tokens(ai_reply)
     ai_record = AiInteraction(
         investigation_id=inv.id,
         interaction_type="COPILOT_CHAT",
         prompt_summary=req.message[:200],
         response_data=ai_reply[:500],
-        model_name=groq_service.model
+        model_name=groq_service.model,
+        tokens_used=in_tokens + out_tokens
     )
     db.add(ai_record)
     await db.flush()
@@ -654,6 +861,14 @@ async def generate_rca_analysis(
     """
     await verify_investigation_access(req.investigation_id, current_user, db, require_write=True)
     inv = await get_investigation_by_id(req.investigation_id, db)
+
+    # Per-user rate limit check
+    await ai_rate_limiter.check_rate_limit(current_user.id)
+
+    async with investigation_concurrency_limiter.acquire(inv.id):
+        return await _execute_generate_rca(inv, req, current_user, db)
+
+async def _execute_generate_rca(inv, req: GenerateRcaRequest, current_user: User, db: AsyncSession):
     if not inv.deviation:
         raise HTTPException(
             status_code=400, 
@@ -726,12 +941,15 @@ async def generate_rca_analysis(
         )
 
     # Record AI interaction
+    in_tokens = estimate_tokens(str(dev_dict)) + estimate_tokens(combined_context or "")
+    out_tokens = estimate_tokens(str(rca_data))
     ai_record = AiInteraction(
         investigation_id=inv.id,
         interaction_type="RCA_ANALYSIS",
         prompt_summary=f"Generated 5-Whys, Fishbone, Root Cause, and CAPA for {inv.deviation.batch_number}",
         response_data=str(rca_data)[:500],
-        model_name=groq_service.model
+        model_name=groq_service.model,
+        tokens_used=in_tokens + out_tokens
     )
     db.add(ai_record)
     await db.flush()

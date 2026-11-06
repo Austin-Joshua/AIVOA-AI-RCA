@@ -8,7 +8,6 @@ import {
   FlaskConical,
   User,
   LogOut,
-  ChevronDown,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -57,7 +56,7 @@ export const Header = ({ isDark, onToggleTheme }) => {
         {/* ── Brand / Logo (Clickable redirect to Home) ────────────────── */}
         <button
           onClick={handleLogoClick}
-          aria-label="AIVO.AI Home - Return to workspace"
+          aria-label="AIVOA.AI Home - Return to workspace"
           className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl py-1 px-1.5 transition-all cursor-pointer text-left shrink-0 active:scale-95"
         >
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-800 via-blue-700 to-indigo-800 p-[1.5px] shadow-md shadow-blue-900/20 group-hover:shadow-blue-800/40 transition-all">
@@ -68,7 +67,7 @@ export const Header = ({ isDark, onToggleTheme }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-black text-lg tracking-tight bg-gradient-to-r from-blue-800 via-blue-700 to-indigo-800 dark:from-blue-400 dark:via-blue-300 dark:to-indigo-400 bg-clip-text text-transparent">
-                AIVO.AI
+                AIVOA.AI
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 font-mono border border-amber-300 dark:border-amber-700/60 font-bold shadow-2xs">
                 RCA Intelligence

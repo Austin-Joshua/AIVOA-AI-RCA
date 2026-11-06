@@ -17,6 +17,9 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class DemoLoginRequest(BaseModel):
+    persona: str = Field(..., description="'investigator' or 'qa'")
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "Bearer"
@@ -96,9 +99,63 @@ async def get_auth_config():
     Does not expose secrets, credentials, or internal configuration paths.
     """
     return {
-        "demo_login_enabled": settings.allows_demo_seeding,
+        "demo_login_enabled": settings.demo_login_allowed,
         "environment": "production" if settings.is_production else settings.ENVIRONMENT,
     }
+
+@router.post("/demo-login", response_model=TokenResponse)
+async def demo_login(req: DemoLoginRequest, db: AsyncSession = Depends(get_db)):
+    """
+    One-click demo login for recording/demo environments only.
+    Works ONLY when ALLOW_DEMO_LOGIN=true and ENVIRONMENT != production.
+    Reads password/credentials from server-side environment and logs an audit entry.
+    """
+    if not settings.demo_login_allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo login is disabled in this environment."
+        )
+
+    persona = req.persona.strip().lower()
+    if persona not in ("investigator", "qa"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid persona. Expected 'investigator' or 'qa'."
+        )
+
+    await ensure_default_users(db)
+
+    username = "lead_investigator" if persona == "investigator" else "qa_director"
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Demo account '{username}' is not provisioned."
+        )
+
+    logger.info(
+        f"AUDIT_AUTH: Demo login granted for persona='{persona}' username='{user.username}' user_id={user.id}"
+    )
+
+    token_data = {
+        "sub": user.username,
+        "user_id": user.id,
+        "role": user.role,
+        "full_name": user.full_name
+    }
+    token = create_access_token(token_data)
+
+    return TokenResponse(
+        access_token=token,
+        expires_in_seconds=24 * 3600,
+        user_id=user.id,
+        username=user.username,
+        full_name=user.full_name,
+        role=user.role,
+        department=user.department or "Quality Assurance"
+    )
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):

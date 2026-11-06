@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   FlaskConical,
@@ -9,9 +9,6 @@ import {
   LogIn,
   Sun,
   Moon,
-  CheckCircle2,
-  Cpu,
-  Layers,
   Sparkles,
   ArrowRight,
   Eye,
@@ -19,11 +16,11 @@ import {
   GitFork,
   FileSearch,
   FileCheck,
-  Crown,
 } from 'lucide-react';
-import { loginUser } from '../../store/authSlice';
+import { loginUser, demoLoginUser } from '../../store/authSlice';
 import { fetchInvestigations, fetchInvestigationById } from '../../store/investigationSlice';
 import { setNotification } from '../../store/uiSlice';
+import api from '../../services/api';
 
 export const SignInPage = ({ onToggleTheme, isDark }) => {
   const dispatch = useDispatch();
@@ -33,6 +30,23 @@ export const SignInPage = ({ onToggleTheme, isDark }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [demoLoginEnabled, setDemoLoginEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.get('/auth/config')
+      .then((res) => {
+        if (isMounted && res.data?.demo_login_enabled) {
+          setDemoLoginEnabled(true);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setDemoLoginEnabled(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -59,10 +73,23 @@ export const SignInPage = ({ onToggleTheme, isDark }) => {
     }
   };
 
-  const handleSelectDemoPersona = (demoUser, demoPass) => {
-    setUsername(demoUser);
-    setPassword(demoPass);
+  const handleDemoLogin = async (persona) => {
     setLocalError('');
+    const res = await dispatch(demoLoginUser({ persona }));
+    if (!res.error) {
+      dispatch(
+        setNotification({
+          type: 'success',
+          message: `Authenticated as ${res.payload.user.full_name} (${res.payload.user.role})`,
+        })
+      );
+      const invAction = await dispatch(fetchInvestigations());
+      if (invAction.payload && invAction.payload.length > 0) {
+        dispatch(fetchInvestigationById(invAction.payload[0].id));
+      }
+    } else {
+      setLocalError(res.payload || 'Demo authentication failed. Demo login may be disabled.');
+    }
   };
 
   return (
@@ -96,122 +123,88 @@ export const SignInPage = ({ onToggleTheme, isDark }) => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-2xl tracking-tight bg-gradient-to-r from-blue-800 via-blue-700 to-indigo-800 dark:from-blue-400 dark:via-blue-300 dark:to-indigo-400 bg-clip-text text-transparent">
-                  AIVO.AI
+                  AIVOA.AI
                 </span>
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-mono border border-amber-300 dark:border-amber-700/60 font-bold shadow-2xs">
-                  cGMP Enterprise Platform
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-mono border border-slate-300 dark:border-slate-700 font-medium">
+                  Decision-support prototype
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Autonomous Root Cause Analysis &amp; CAPA Intelligence for API Manufacturing
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                RCA Intelligence Suite for Active Pharmaceutical Ingredient (API) Manufacturing
               </p>
             </div>
           </div>
 
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight max-w-2xl">
-            Autonomous Deviation Triage &amp;{' '}
+            AI-assisted root cause investigation for{' '}
             <span className="bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-              Regulatory-Grade
-            </span>{' '}
-            Root Cause Analysis
+              API manufacturing deviations
+            </span>
           </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 max-w-2xl leading-relaxed">
-            AIVO.AI combines multi-agent causality reasoning, verbatim-cited evidence grounding, and dual-methodology synthesis (5-Whys causal chaining and Ishikawa 6Ms) to accelerate deviation investigations from weeks to hours while ensuring strict compliance with ICH Q9, ICH Q10, and FDA 21 CFR Part 11.
+          <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mt-2 max-w-2xl">
+            AI suggests; qualified people decide.
           </p>
 
-          {/* Key Value Metrics Bar — Gold Accented Numbers */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6">
-            <div className="skeuo-card rounded-2xl p-3 border border-slate-300 dark:border-[#1e2236] text-center">
-              <span className="text-xl font-extrabold text-amber-700 dark:text-amber-400 font-mono">70%</span>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mt-0.5">RCA Cycle Time Reduction</p>
-            </div>
-            <div className="skeuo-card rounded-2xl p-3 border border-slate-300 dark:border-[#1e2236] text-center">
-              <span className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400 font-mono">100%</span>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mt-0.5">Verbatim Citation Grounding</p>
-            </div>
-            <div className="skeuo-card rounded-2xl p-3 border border-slate-300 dark:border-[#1e2236] text-center">
-              <span className="text-xl font-extrabold text-blue-800 dark:text-blue-400 font-mono">0</span>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mt-0.5">Silent Hallucinations</p>
-            </div>
-            <div className="skeuo-card rounded-2xl p-3 border border-slate-300 dark:border-[#1e2236] text-center">
-              <span className="text-xl font-extrabold text-blue-900 dark:text-blue-300 font-mono">Part 11</span>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mt-0.5">Immutable SHA-256 Logs</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Core Platform Architecture Grid ─────────────────────────── */}
-        <div className="my-4 max-w-2xl w-full space-y-3.5">
-          <p className="text-xs uppercase font-extrabold text-slate-500 dark:text-slate-400 tracking-wider font-mono flex items-center gap-1.5">
-            <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            Core Investigation Capabilities
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] space-y-1.5">
-              <div className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+          {/* Three Honest Core Capabilities */}
+          <div className="my-6 max-w-2xl w-full space-y-3">
+            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-700 dark:text-blue-400 shrink-0 border border-blue-200 dark:border-blue-800/50">
                 <FileSearch className="w-4 h-4" />
-                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">Multimodal Incident Ingestion</h4>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                Ingests multipage batch records (BPRs), shift handover notes, SCADA telemetry alarms, and analytical deviation memos with verbatim citation mapping.
-              </p>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                  1. Extract from documents with cited sources
+                </h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                  Ingests batch production records (BPRs), shift handover notes, and analytical records with verbatim source excerpts and page citations.
+                </p>
+              </div>
             </div>
 
-            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] space-y-1.5">
-              <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
+            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-700 dark:text-indigo-400 shrink-0 border border-indigo-200 dark:border-indigo-800/50">
                 <GitFork className="w-4 h-4" />
-                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">Dual-Engine Causality Mapping</h4>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                Synthesizes 5-Whys causal chains and Ishikawa 6Ms (Machine, Method, Material, Measurement, Man, Milieu) to isolate confirmed root causes from contributing factors.
-              </p>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                  2. 5 Whys and fishbone suggestions
+                </h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                  Generates structured 5-Whys causal chains and Ishikawa 6M diagrams. All AI causes remain suggestions until verified by a qualified investigator.
+                </p>
+              </div>
             </div>
 
-            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] space-y-1.5">
-              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="w-4 h-4" />
-                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">Evidence Gap &amp; Risk Detection</h4>
-              </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                Proactively detects missing calibration logs, unattached work orders, and unresolved discrepancies before QA dossier sign-off.
-              </p>
-            </div>
-
-            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] space-y-1.5">
-              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            <div className="skeuo-card rounded-2xl p-4 border border-slate-300 dark:border-[#1e2236] flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-700 dark:text-amber-400 shrink-0 border border-amber-200 dark:border-amber-800/50">
                 <FileCheck className="w-4 h-4" />
-                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">Closed-Loop CAPA &amp; QA Sign-Off</h4>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                Generates preventive actions with assignees and quantitative effectiveness criteria. Enforces Separation of Duties with 21 CFR Part 11 electronic sign-off.
-              </p>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                  3. CAPA drafts with rationale
+                </h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                  Formulates preventive action proposals with explicit regulatory rationales and measurable effectiveness verification criteria.
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Regulatory & Enterprise Compliance Badges */}
+        {/* Regulatory & Scientific Methodology Footnote */}
         <div className="flex items-center gap-4 sm:gap-6 flex-wrap pt-4 border-t border-slate-300 dark:border-[#1e2236]/80 text-[11px] text-slate-600 dark:text-slate-400 font-semibold">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span>ALCOA+ Data Integrity</span>
+            <span>ALCOA+ Data Integrity Principles</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-blue-700 dark:text-blue-400 shrink-0" />
-            <span>21 CFR Part 11 Compliant</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-blue-800 dark:text-blue-300 shrink-0" />
-            <span>ICH Q9 / Q10 Quality System</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Cpu className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Cryptographic SHA-256 Audit Trail</span>
+            <FlaskConical className="w-4 h-4 text-blue-700 dark:text-blue-400 shrink-0" />
+            <span>ICH Q9 / Q10 Quality Risk Management</span>
           </div>
         </div>
       </div>
 
-      {/* ── RIGHT PANEL: Royal Authentication Vault ───────────────────── */}
+      {/* ── RIGHT PANEL: Authentication Vault ─────────────────────────── */}
       <div className="lg:w-[42%] xl:w-[38%] p-6 sm:p-10 lg:p-12 flex flex-col justify-center items-center relative z-10 bg-slate-50 dark:bg-[#020308]">
         <div className="w-full max-w-md">
           {/* Vault Card */}
@@ -221,7 +214,7 @@ export const SignInPage = ({ onToggleTheme, isDark }) => {
                 <Lock className="w-6 h-6" />
               </div>
               <span className="text-[10px] font-mono uppercase px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 text-blue-800 dark:text-blue-300 font-bold">
-                Quality System Portal v2.4
+                Quality System Portal
               </span>
             </div>
 
@@ -232,41 +225,45 @@ export const SignInPage = ({ onToggleTheme, isDark }) => {
               Sign in with your verified cGMP investigator or approver credentials.
             </p>
 
-            {/* Quick Demo Persona Shortcuts */}
-            <div className="mb-6 p-3.5 rounded-2xl bg-blue-50/50 dark:bg-[#0c0e1a] border border-blue-200 dark:border-[#1e2236]">
-              <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 tracking-wider mb-2.5 flex items-center gap-1 font-mono">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                Quick-Select Test Personas:
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => handleSelectDemoPersona('lead_investigator', 'AivoaPass2026!')}
-                  className="skeuo-btn-secondary text-left p-2.5 rounded-xl text-xs flex flex-col transition border-blue-200 dark:border-blue-800/40 hover:border-blue-400 cursor-pointer"
-                >
-                  <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                    Dr. Sarah Lin
-                    <ArrowRight className="w-3 h-3 text-blue-700 dark:text-blue-400" />
-                  </span>
-                  <span className="text-[10px] text-blue-800 dark:text-blue-300 font-mono mt-0.5 font-bold">
-                    Role: INVESTIGATOR
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectDemoPersona('qa_director', 'AivoaPass2026!')}
-                  className="skeuo-btn-secondary text-left p-2.5 rounded-xl text-xs flex flex-col transition border-amber-200 dark:border-amber-800/40 hover:border-amber-400 cursor-pointer"
-                >
-                  <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                    Dr. Elena Rostova
-                    <ArrowRight className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                  </span>
-                  <span className="text-[10px] text-amber-800 dark:text-amber-300 font-mono mt-0.5 font-bold">
-                    Role: QA_APPROVER
-                  </span>
-                </button>
+            {/* Quick Demo Persona Shortcuts — Neutral names, server-side env auth only */}
+            {demoLoginEnabled && (
+              <div className="mb-6 p-3.5 rounded-2xl bg-blue-50/50 dark:bg-[#0c0e1a] border border-blue-200 dark:border-[#1e2236]">
+                <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 tracking-wider mb-2.5 flex items-center gap-1 font-mono">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  Recording / Demo Shortcuts:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('investigator')}
+                    disabled={status === 'loading'}
+                    className="skeuo-btn-secondary text-left p-2.5 rounded-xl text-xs flex flex-col transition border-blue-200 dark:border-blue-800/40 hover:border-blue-400 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      Demo Investigator
+                      <ArrowRight className="w-3 h-3 text-blue-700 dark:text-blue-400" />
+                    </span>
+                    <span className="text-[10px] text-blue-800 dark:text-blue-300 font-mono mt-0.5 font-bold">
+                      Role: INVESTIGATOR
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('qa')}
+                    disabled={status === 'loading'}
+                    className="skeuo-btn-secondary text-left p-2.5 rounded-xl text-xs flex flex-col transition border-amber-200 dark:border-amber-800/40 hover:border-amber-400 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      Demo QA Reviewer
+                      <ArrowRight className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                    </span>
+                    <span className="text-[10px] text-amber-800 dark:text-amber-300 font-mono mt-0.5 font-bold">
+                      Role: QA_APPROVER
+                    </span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -339,7 +336,7 @@ export const SignInPage = ({ onToggleTheme, isDark }) => {
 
             {/* Footer Trust / Notice */}
             <div className="mt-6 pt-4 border-t border-slate-200 dark:border-[#1e2236]/80 text-center text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-              Authorized access only. Every data modification and workflow transition is cryptographically logged under 21 CFR Part 11.
+              Decision-support prototype. Aligned with ICH Q9/Q10 principles; not a validated GxP system. AI output must be reviewed by qualified personnel.
             </div>
           </div>
         </div>

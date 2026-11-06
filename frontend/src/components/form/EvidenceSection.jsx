@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { uploadEvidence, verifyEvidence, deleteEvidence } from '../../store/investigationSlice';
 import { setNotification } from '../../store/uiSlice';
-import { Button, Input, Textarea, Select, Badge, Card, CardHeader, CardContent, ConfirmDialog } from '../ui';
+import { Button, Input, Textarea, Select, Card, CardHeader, CardContent, ConfirmDialog } from '../ui';
 
 export const EvidenceSection = () => {
   const dispatch = useDispatch();

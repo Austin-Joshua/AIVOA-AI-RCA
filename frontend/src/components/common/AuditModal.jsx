@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { X, History, Clock, ShieldCheck, FileText, CheckCircle2 } from 'lucide-react';
+import { X, History, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { setShowAuditModal } from '../../store/uiSlice';
 import { fetchAuditLogs } from '../../store/investigationSlice';
 

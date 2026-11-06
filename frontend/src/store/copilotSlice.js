@@ -80,6 +80,20 @@ export const sendCopilotMessage = createAsyncThunk(
         suggestedActions: res.data.suggested_actions,
       };
     } catch (err) {
+      if (err.response?.status === 429) {
+        const retryAfter = parseInt(err.response?.headers?.['retry-after'] || '60', 10);
+        return rejectWithValue({
+          status: 429,
+          retryAfter,
+          detail: err.response?.data?.detail || 'Rate limit exceeded. Please wait before retrying.',
+        });
+      }
+      if (err.response?.status === 409) {
+        return rejectWithValue({
+          status: 409,
+          detail: err.response?.data?.detail || 'AI is already working on this investigation',
+        });
+      }
       return rejectWithValue(err.response?.data?.detail || 'Failed to get Copilot response');
     }
   }
@@ -95,6 +109,20 @@ export const generateRcaPackage = createAsyncThunk(
       });
       return res.data;
     } catch (err) {
+      if (err.response?.status === 429) {
+        const retryAfter = parseInt(err.response?.headers?.['retry-after'] || '60', 10);
+        return rejectWithValue({
+          status: 429,
+          retryAfter,
+          detail: err.response?.data?.detail || 'Rate limit exceeded. Please wait before retrying.',
+        });
+      }
+      if (err.response?.status === 409) {
+        return rejectWithValue({
+          status: 409,
+          detail: err.response?.data?.detail || 'AI is already working on this investigation',
+        });
+      }
       return rejectWithValue(err.response?.data?.detail || 'Failed to generate RCA package');
     }
   }
@@ -145,6 +173,20 @@ export const converseWithCopilot = createAsyncThunk(
       });
       return res.data;
     } catch (err) {
+      if (err.response?.status === 429) {
+        const retryAfter = parseInt(err.response?.headers?.['retry-after'] || '60', 10);
+        return rejectWithValue({
+          status: 429,
+          retryAfter,
+          detail: err.response?.data?.detail || 'Rate limit exceeded. Please wait before retrying.',
+        });
+      }
+      if (err.response?.status === 409) {
+        return rejectWithValue({
+          status: 409,
+          detail: err.response?.data?.detail || 'AI is already working on this investigation',
+        });
+      }
       return rejectWithValue(err.response?.data?.detail || 'Failed to converse with Copilot');
     }
   }
@@ -191,12 +233,20 @@ const initialState = {
   highlightedFieldKey: null,
   
   activeTab: 'chat', // 'chat', 'intake', 'gaps', 'engine', 'workflow'
+  rateLimitUntil: null,
+  concurrencyError: null,
 };
 
 const copilotSlice = createSlice({
   name: 'copilot',
   initialState,
   reducers: {
+    clearRateLimit: (state) => {
+      state.rateLimitUntil = null;
+    },
+    clearConcurrencyError: (state) => {
+      state.concurrencyError = null;
+    },
     setActiveTab: (state, action) => {
       state.activeTab = action.payload;
     },
@@ -329,9 +379,15 @@ const copilotSlice = createSlice({
       })
       .addCase(sendCopilotMessage.rejected, (state, action) => {
         state.isChatting = false;
+        const detail = action.payload?.detail || action.payload || 'Inference error';
+        if (action.payload?.status === 429) {
+          state.rateLimitUntil = Date.now() + (action.payload.retryAfter || 60) * 1000;
+        } else if (action.payload?.status === 409) {
+          state.concurrencyError = detail;
+        }
         state.chatMessages.push({
           role: 'assistant',
-          content: `Error: ${action.payload}`,
+          content: `Error: ${detail}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         });
       })
@@ -347,7 +403,13 @@ const copilotSlice = createSlice({
       })
       .addCase(generateRcaPackage.rejected, (state, action) => {
         state.isGeneratingRca = false;
-        state.rcaError = action.payload;
+        const detail = action.payload?.detail || action.payload || 'RCA generation error';
+        if (action.payload?.status === 429) {
+          state.rateLimitUntil = Date.now() + (action.payload.retryAfter || 60) * 1000;
+        } else if (action.payload?.status === 409) {
+          state.concurrencyError = detail;
+        }
+        state.rcaError = detail;
       })
 
       // converseWithCopilot
@@ -384,9 +446,15 @@ const copilotSlice = createSlice({
       })
       .addCase(converseWithCopilot.rejected, (state, action) => {
         state.isChatting = false;
+        const detail = action.payload?.detail || action.payload || 'Inference error';
+        if (action.payload?.status === 429) {
+          state.rateLimitUntil = Date.now() + (action.payload.retryAfter || 60) * 1000;
+        } else if (action.payload?.status === 409) {
+          state.concurrencyError = detail;
+        }
         state.chatMessages.push({
           role: 'assistant',
-          content: `Error: ${action.payload}`,
+          content: `Error: ${detail}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         });
       })
@@ -447,7 +515,9 @@ export const {
   acceptAllSourceFacts,
   setDraftPatch,
   setHighlightedFieldKey,
-  clearDraftPatches
+  clearDraftPatches,
+  clearRateLimit,
+  clearConcurrencyError
 } = copilotSlice.actions;
 export default copilotSlice.reducer;
 

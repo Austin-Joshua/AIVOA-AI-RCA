@@ -34,6 +34,19 @@ if "GROQ_API_KEY" not in os.environ or not os.environ["GROQ_API_KEY"]:
 if "DEMO_ACCOUNT_PASSWORD" not in os.environ:
     os.environ["DEMO_ACCOUNT_PASSWORD"] = "AivoaPass2026!"
 
+# Set generous rate limit for test suites so 190+ test assertions don't throttle
+os.environ["AI_RATE_LIMIT_PER_MINUTE"] = "10000"
+os.environ["AI_RATE_LIMIT_PER_HOUR"] = "50000"
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiters():
+    from app.services.rate_limiter import ai_rate_limiter, investigation_concurrency_limiter
+    ai_rate_limiter.reset()
+    investigation_concurrency_limiter.reset()
+    yield
+    ai_rate_limiter.reset()
+    investigation_concurrency_limiter.reset()
+
 
 def pytest_addoption(parser):
     parser.addoption(

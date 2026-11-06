@@ -25,6 +25,8 @@ from app.schemas.investigation import InvestigationRead
 from app.services.langgraph_workflow import rca_graph
 from app.services.audit_service import audit_service
 from app.services.storage_service import storage_service
+from app.services.rate_limiter import ai_rate_limiter, investigation_concurrency_limiter
+from app.services.token_budget import estimate_tokens
 from app.services.document_parser import document_parser
 from app.services.groq_service import (
     groq_service,
@@ -53,9 +55,14 @@ async def parse_incident_file(
     Runs the full LangGraph ingestion & extraction pipeline with upload validation and page-level integrity.
     If investigation_id is provided, verifies authorization and persists the original file in isolated storage.
     """
+    await ai_rate_limiter.check_rate_limit(current_user.id)
     if investigation_id:
         await verify_investigation_access(investigation_id, current_user, db, require_write=True)
 
+    async with investigation_concurrency_limiter.acquire(investigation_id):
+        return await _execute_parse_file(file, investigation_id, current_user, db)
+
+async def _execute_parse_file(file: UploadFile, investigation_id: Optional[int], current_user: User, db: AsyncSession):
     file_bytes, filename, ext = await storage_service.read_and_validate_upload(file)
     source_type = "PDF" if ext == ".pdf" else ("EMAIL" if ext == ".eml" else "TEXT")
 
@@ -166,9 +173,14 @@ async def parse_incident_text(
     Process pasted deviation text or email notification.
     Preserves raw content, parses RFC 5322 headers, computes SHA-256 fingerprint, and runs full extraction.
     """
+    await ai_rate_limiter.check_rate_limit(current_user.id)
     if investigation_id:
         await verify_investigation_access(investigation_id, current_user, db, require_write=True)
 
+    async with investigation_concurrency_limiter.acquire(investigation_id):
+        return await _execute_parse_text(content, is_email, investigation_id, current_user, db)
+
+async def _execute_parse_text(content: str, is_email: bool, investigation_id: Optional[int], current_user: User, db: AsyncSession):
     if not content or not content.strip():
         raise HTTPException(status_code=400, detail="Incident text content cannot be empty.")
 
@@ -339,13 +351,14 @@ async def apply_ai_extraction_to_investigation(
                 db.add(new_dev)
                 inv.deviation = new_dev
 
-            # Record AI interaction row with active model_name
+            # Record AI interaction row with active model_name and token tracking
             ai_record = AiInteraction(
                 investigation_id=inv.id,
                 interaction_type="INTAKE_EXTRACTION",
                 prompt_summary=f"Applied intake extraction review for deviation {inv.deviation.deviation_number}",
                 response_data=f"Batch: {inv.deviation.batch_number}, Product: {inv.deviation.product_name}, Source: {inv.deviation.deviation_number_source}",
-                model_name=groq_service.model
+                model_name=groq_service.model,
+                tokens_used=estimate_tokens(str(dev_data))
             )
             db.add(ai_record)
 
