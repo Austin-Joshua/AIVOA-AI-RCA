@@ -423,6 +423,12 @@ export const EvidenceSection = () => {
               Formally verify that <strong>"{showVerifyModal.title}"</strong> has been examined and corroborates physical manufacturing records.
             </p>
 
+            {showVerifyModal.uploaded_by_user_id === currentUser?.id && (
+              <div className="p-2.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs">
+                <strong>Separation of Duties Notice:</strong> You originally uploaded or ingested this evidence record. In accordance with cGMP standards, verification requires an independent QA reviewer.
+              </div>
+            )}
+
             <div className="space-y-3">
               <Input
                 label="Investigator Name"

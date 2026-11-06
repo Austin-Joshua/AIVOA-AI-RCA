@@ -19,7 +19,7 @@ async function runAutoDemo() {
   // Launch Chrome in true fullscreen maximizing user display
   const browser = await chromium.launch({
     headless: false,
-    slowMo: 300,
+    slowMo: 250,
     args: [
       '--start-maximized',
       '--start-fullscreen',
@@ -215,7 +215,7 @@ async function runAutoDemo() {
     await page.waitForTimeout(2000);
   }
 
-  // ── Scene 6: Evidence & Timeline + Verification Modal ──────────────────────
+  // ── Scene 6: Evidence & Timeline Inspection ────────────────────────────────
   console.log('👉 [Scene 6] Navigating to Evidence & Timeline section...');
   const stage2Btn = page.locator('button:has-text("2. Evidence & Timeline")');
   if (await stage2Btn.isVisible().catch(() => false)) {
@@ -223,30 +223,14 @@ async function runAutoDemo() {
     await page.waitForTimeout(1800);
   }
 
-  // Formally verify empirical evidence through the verification modal
-  const verifyBtn = page.locator('button:has-text("Verify")').first();
-  if (await verifyBtn.isVisible().catch(() => false)) {
-    console.log('👉 [Scene 6] Opening Evidence Verification modal...');
-    await verifyBtn.click();
-    await page.waitForTimeout(1000);
-
-    const notesInput = page.locator('textarea[placeholder*="Examined physical batch log"]');
-    if (await notesInput.isVisible().catch(() => false)) {
-      console.log('👉 [Scene 6] Typing verification justification notes...');
-      await typeHuman(
-        notesInput,
-        'Cross-referenced SCADA historian tag TI-104 with physical calibration sticker CAL-2026-88 on reactor jacket.',
-        25
-      );
-      await page.waitForTimeout(500);
-    }
-
-    const signVerifyBtn = page.locator('button:has-text("Sign & Verify Record")');
-    if (await signVerifyBtn.isVisible().catch(() => false)) {
-      console.log('👉 [Scene 6] Signing and verifying evidence record...');
-      await signVerifyBtn.click();
-      await page.waitForTimeout(1800);
-    }
+  // Expand the verified empirical SCADA log to inspect verbatim historian data
+  const expandBtn = page.locator('button[aria-label="Toggle excerpt"]').first();
+  if (await expandBtn.isVisible().catch(() => false)) {
+    console.log('👉 [Scene 6] Expanding verified SCADA telemetry excerpt...');
+    await expandBtn.click();
+    await page.waitForTimeout(2200);
+    await expandBtn.click(); // collapse back cleanly
+    await page.waitForTimeout(800);
   }
 
   // ── Scene 7: 5-Whys & Fishbone Diagram ────────────────────────────────────
@@ -358,8 +342,42 @@ async function runAutoDemo() {
     await page.waitForTimeout(2000);
   }
 
-  // ── Scene 11: QA Director Electronic Signature (21 CFR Part 11) ───────────
-  console.log('👉 [Scene 11] Navigating to Stage 5 for formal QA approval...');
+  // ── Scene 11: QA Director Verification of AI Ingestion Evidence ───────────
+  console.log('👉 [Scene 11] QA Director navigating to Stage 2 to verify AI-ingested evidence...');
+  const stage2BtnQA = page.locator('button:has-text("2. Evidence & Timeline")');
+  if (await stage2BtnQA.isVisible().catch(() => false)) {
+    await stage2BtnQA.click();
+    await page.waitForTimeout(1500);
+  }
+
+  // As QA Director (QA_APPROVER role), verify the unverified AI ingestion record
+  const verifyBtnQA = page.locator('button:has-text("Verify")').first();
+  if (await verifyBtnQA.isVisible().catch(() => false)) {
+    console.log('👉 [Scene 11] QA Director opening verification modal...');
+    await verifyBtnQA.click();
+    await page.waitForTimeout(1000);
+
+    const notesInput = page.locator('textarea[placeholder*="Examined physical batch log"]');
+    if (await notesInput.isVisible().catch(() => false)) {
+      await typeHuman(
+        notesInput,
+        'Independent QA verification: cross-referenced raw AI intake report against physical manufacturing records and QA batch dossier.',
+        25
+      );
+      await page.waitForTimeout(500);
+    }
+
+    const signVerifyBtn = page.locator('button:has-text("Sign & Verify Record")');
+    if (await signVerifyBtn.isVisible().catch(() => false)) {
+      console.log('👉 [Scene 11] Submitting QA verification signature (HTTP 200 OK)...');
+      await signVerifyBtn.click();
+      await page.waitForTimeout(2000);
+      console.log('✓ Evidence formally verified by QA Director!');
+    }
+  }
+
+  // ── Scene 12: QA Director Electronic Signature (21 CFR Part 11) ───────────
+  console.log('👉 [Scene 12] Navigating to Stage 5 for formal QA approval...');
   const stage5BtnQA = page.locator('button:has-text("5. Review & Sign-Off")');
   if (await stage5BtnQA.isVisible().catch(() => false)) {
     await stage5BtnQA.click();
@@ -369,7 +387,7 @@ async function runAutoDemo() {
   // Type QA rationale character-by-character
   const commentsInput = page.locator('textarea[placeholder*="scientific justification"]');
   if (await commentsInput.isVisible().catch(() => false)) {
-    console.log('👉 [Scene 11] Typing formal scientific justification and closure rationale...');
+    console.log('👉 [Scene 12] Typing formal scientific justification and closure rationale...');
     await typeHuman(
       commentsInput,
       'Formally reviewed 5-Whys causality chain and CV-104 pneumatic telemetry. Confirmed actuator seal failure mode and approved CAPA overhaul plan under cGMP guidelines.',
@@ -381,13 +399,13 @@ async function runAutoDemo() {
   // Submit Electronic Signature
   const approveBtn = page.locator('button:has-text("Sign & Approve Investigation")');
   if (await approveBtn.isVisible().catch(() => false)) {
-    console.log('👉 [Scene 11] Executing 21 CFR Part 11 Electronic Signature...');
+    console.log('👉 [Scene 12] Executing 21 CFR Part 11 Electronic Signature...');
     await approveBtn.click();
     await page.waitForTimeout(3000);
   }
 
-  // ── Scene 12: ALCOA+ Audit Trail Dossier ──────────────────────────────────
-  console.log('👉 [Scene 12] Opening Audit Trail Dossier...');
+  // ── Scene 13: ALCOA+ Audit Trail Dossier ──────────────────────────────────
+  console.log('👉 [Scene 13] Opening Audit Trail Dossier...');
   const auditBtn = page.locator('button[aria-label="View audit trail"]');
   if (await auditBtn.isVisible().catch(() => false)) {
     await auditBtn.click();
@@ -398,7 +416,7 @@ async function runAutoDemo() {
   }
 
   // ── Final Scene: Completion Pop-up Message for Video Recording ─────────────
-  console.log('👉 [Scene 13] Displaying Showcase Completion Banner on screen...');
+  console.log('👉 [Scene 14] Displaying Showcase Completion Banner on screen...');
   await page.evaluate(() => {
     const existing = document.getElementById('demo-completion-popup');
     if (existing) existing.remove();
