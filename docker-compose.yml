@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: aivoa-rca-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aivoa_user}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Error: POSTGRES_PASSWORD must be configured in environment or .env file}"
+      POSTGRES_DB: ${POSTGRES_DB:-aivoa_rca}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aivoa_user} -d ${POSTGRES_DB:-aivoa_rca}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aivoa-rca-backend
+    restart: always
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SECRET_KEY: "${SECRET_KEY:?Error: SECRET_KEY must be configured in environment or .env file (min 32 characters)}"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-aivoa_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-aivoa_rca}}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_BACKUP_API_KEY: ${GROQ_BACKUP_API_KEY:-}
+      GROQ_PROJECT_ID: ${GROQ_PROJECT_ID:-}
+      GROQ_BACKUP_PROJECT_ID: ${GROQ_BACKUP_PROJECT_ID:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      ENABLE_DEMO_PROVISIONING: ${ENABLE_DEMO_PROVISIONING:-false}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aivoa-rca-frontend
+    restart: always
+    environment:
+      VITE_ENABLE_DEMO_LOGIN: ${VITE_ENABLE_DEMO_LOGIN:-false}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+

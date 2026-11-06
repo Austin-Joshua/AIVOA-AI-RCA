@@ -1,0 +1,339 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+
+  /* Royal Blue Brand Palette */
+  --color-brand-50: #eff3ff;
+  --color-brand-100: #dbe4fe;
+  --color-brand-200: #bfcffe;
+  --color-brand-300: #93a8fd;
+  --color-brand-400: #6079fa;
+  --color-brand-500: #3b55f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Royal Gold Accent Palette */
+  --color-gold-50: #fefce8;
+  --color-gold-100: #fef9c3;
+  --color-gold-200: #fef08a;
+  --color-gold-300: #f5d060;
+  --color-gold-400: #d4a843;
+  --color-gold-500: #b8860b;
+  --color-gold-600: #a16207;
+  --color-gold-700: #854d0e;
+  --color-gold-800: #713f12;
+  --color-gold-900: #5c3210;
+
+  /* Surface Hierarchy — light */
+  --color-surface-canvas: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f1f5f9;
+  --color-surface-muted: #e2e8f0;
+
+  /* Semantic Status Colors (Pharma-QMS Precision) */
+  --color-status-verified: #059669;
+  --color-status-inference: #d97706;
+  --color-status-edited: #2563eb;
+  --color-status-missing: #e11d48;
+}
+
+@layer base {
+  /* ── Light mode (default) ── */
+  :root {
+    --bg-canvas: #f0f2f7;
+    --bg-card: #ffffff;
+    --bg-subtle: #f5f7fb;
+    --text-base: #0f172a;
+    --text-muted: #475569;
+    --border-base: #c7d0e0;
+  }
+
+  /* ── Dark mode (class-based: add class="dark" to <html>) ── */
+  .dark {
+    --bg-canvas: #020308;
+    --bg-card: #080a12;
+    --bg-subtle: #0c0e18;
+    --text-base: #f0f1f5;
+    --text-muted: #9ca3b4;
+    --border-base: #1e2236;
+  }
+
+  body {
+    background-color: var(--bg-canvas);
+    color: var(--text-base);
+    font-family: var(--font-sans);
+    antialiased: true;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
+  }
+
+  /* Monospace font for IDs, measurements & timestamps */
+  code, kbd, samp, pre, .font-mono {
+    font-feature-settings: 'tnum';
+    font-family: var(--font-mono);
+  }
+}
+
+/* ── Royal Skeuomorphic Design System ──────────────────────────────────── */
+
+/* Tactile Skeuomorphic Card — Warm Ivory Light / Deep Navy Dark */
+.skeuo-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9fd 100%);
+  border: 1px solid #c7d0e0;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 1),
+    0 1px 3px 0 rgba(30, 58, 138, 0.05),
+    0 4px 12px -2px rgba(30, 58, 138, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .skeuo-card {
+  background: linear-gradient(180deg, #0c0e1a 0%, #060814 100%);
+  border: 1px solid #1e2236;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 1px 3px 0 rgba(0, 0, 0, 0.7),
+    0 8px 24px -4px rgba(0, 0, 0, 0.9);
+}
+
+/* Higher Elevation Surface */
+.skeuo-surface-raised {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+  border: 1px solid #c7d0e0;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 1),
+    0 8px 24px -4px rgba(30, 58, 138, 0.08),
+    0 4px 8px -2px rgba(30, 58, 138, 0.04);
+}
+
+.dark .skeuo-surface-raised {
+  background: linear-gradient(180deg, #0c0e1a 0%, #060814 100%);
+  border: 1px solid #1e2236;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 16px 40px -8px rgba(0, 0, 0, 0.9),
+    0 8px 16px -4px rgba(0, 0, 0, 0.85);
+}
+
+/* Recessed Inset Well for Inputs & Readouts */
+.skeuo-well {
+  background-color: #f5f7fb;
+  border: 1px solid #c7d0e0;
+  box-shadow:
+    inset 0 2px 4px 0 rgba(30, 58, 138, 0.06),
+    inset 0 1px 1px 0 rgba(30, 58, 138, 0.04),
+    0 1px 0 0 rgba(255, 255, 255, 0.8);
+  transition: all 0.15s ease;
+}
+
+.dark .skeuo-well {
+  background-color: #060814;
+  border: 1px solid #1e2236;
+  box-shadow:
+    inset 0 2px 5px 0 rgba(0, 0, 0, 0.9),
+    inset 0 1px 2px 0 rgba(0, 0, 0, 0.7),
+    0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Tactile Primary Button — Royal Blue with Gold Inset Sheen */
+.skeuo-btn-primary {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 60%, #1e3a8a 100%);
+  border: 1px solid #1e3a8a;
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.2),
+    0 2px 4px 0 rgba(30, 58, 138, 0.35),
+    0 1px 2px 0 rgba(15, 23, 42, 0.1);
+  transition: all 0.12s ease;
+}
+
+.skeuo-btn-primary:hover {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 60%, #1d4ed8 100%);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.35),
+    0 4px 8px 0 rgba(30, 58, 138, 0.4),
+    0 2px 4px 0 rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.skeuo-btn-primary:active {
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
+  box-shadow:
+    inset 0 2px 4px 0 rgba(0, 0, 0, 0.3),
+    0 1px 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(1px);
+}
+
+/* Tactile Secondary / Metallic Button — Subtle Royal Blue Border Tint */
+.skeuo-btn-secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f2f7 100%);
+  border: 1px solid #c7d0e0;
+  color: #0f172a;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px 0 rgba(30, 58, 138, 0.05);
+  transition: all 0.12s ease;
+}
+
+.dark .skeuo-btn-secondary {
+  background: linear-gradient(180deg, #12152a 0%, #080a14 100%);
+  border: 1px solid #1e2236;
+  color: #f0f1f5;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 1px 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.skeuo-btn-secondary:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #e8ebf4 100%);
+  border-color: #93a3c0;
+  transform: translateY(-1px);
+}
+
+.dark .skeuo-btn-secondary:hover {
+  background: linear-gradient(180deg, #1a1e38 0%, #12152a 100%);
+  border-color: #2a3050;
+  transform: translateY(-1px);
+}
+
+.skeuo-btn-secondary:active {
+  box-shadow: inset 0 2px 3px 0 rgba(30, 58, 138, 0.1);
+  transform: translateY(1px);
+}
+
+.dark .skeuo-btn-secondary:active {
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.7);
+  transform: translateY(1px);
+}
+
+/* Tactile Header Bar — Royal Blue Chrome */
+.skeuo-header-bar {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f2f7 100%);
+  border-bottom: 1px solid #c7d0e0;
+  box-shadow:
+    0 2px 10px -2px rgba(30, 58, 138, 0.06),
+    inset 0 -1px 0 0 rgba(30, 58, 138, 0.04);
+  color: #0f172a;
+}
+
+.dark .skeuo-header-bar {
+  background: linear-gradient(180deg, #080a14 0%, #020308 100%);
+  border-bottom: 1px solid #1e2236;
+  box-shadow:
+    0 4px 20px 0 rgba(0, 0, 0, 0.9),
+    inset 0 -1px 0 0 rgba(37, 99, 235, 0.08);
+  color: #f0f1f5;
+}
+
+/* Metallic Stepper / Sidebar Track */
+.skeuo-stepper {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f2f7 100%);
+  border-bottom: 1px solid #c7d0e0;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 1),
+    0 2px 6px 0 rgba(30, 58, 138, 0.04);
+}
+
+.dark .skeuo-stepper {
+  background: linear-gradient(180deg, #080a14 0%, #020308 100%);
+  border-bottom: 1px solid #1e2236;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 4px 12px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* Tactile Active Step — Royal Blue Glow */
+.skeuo-step-btn-active {
+  background: linear-gradient(180deg, #eff3ff 0%, #dbe4fe 100%);
+  border: 1px solid #6079fa;
+  color: #1d4ed8;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+    0 2px 6px 0 rgba(37, 99, 235, 0.2);
+}
+
+.dark .skeuo-step-btn-active {
+  background: linear-gradient(180deg, #12152a 0%, #0a0c1a 100%);
+  border: 1px solid rgba(96, 121, 250, 0.6);
+  color: #93a8fd;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+    0 2px 8px 0 rgba(37, 99, 235, 0.15);
+}
+
+/* Shimmer & Glow Animations */
+@keyframes ambientGlow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+.animate-ambient-glow {
+  animation: ambientGlow 6s ease-in-out infinite;
+}
+
+@keyframes pulseLed {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.92);
+  }
+}
+
+.animate-pulse-led {
+  animation: pulseLed 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom Scrollbar Styling — Royal Blue Tints */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #b8c4dc;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8694b2;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e2236;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #2a3050;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Smooth transitions */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
