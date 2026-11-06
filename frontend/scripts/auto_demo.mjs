@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 
 // Helper for human-like character-by-character typing
-async function typeHuman(locator, text, delayMs = 35) {
+async function typeHuman(locator, text, delayMs = 30) {
   await locator.focus();
   try {
     await locator.clear();
@@ -13,7 +13,7 @@ async function typeHuman(locator, text, delayMs = 35) {
 
 async function runAutoDemo() {
   console.log('================================================================');
-  console.log('🚀 AIVOA.AI — True Fullscreen Automated Showcase Video Recording');
+  console.log('🚀 AIVOA.AI — Complete AI-Powered RCA Showcase (Fullscreen)');
   console.log('================================================================');
   
   // Launch Chrome in true fullscreen maximizing user display
@@ -80,59 +80,135 @@ async function runAutoDemo() {
     await page.waitForTimeout(1500);
   }
 
-  // ── Scene 4: AI Copilot Interactive Chat & Multi-Tab Tour ──────────────────
-  console.log('👉 [Scene 4] Typing interactive investigation query in AI Copilot...');
+  // ── Scene 4: Comprehensive AI Copilot Utilization ──────────────────────────
+  console.log('👉 [Scene 4] Engaging AI Copilot: Interactive Investigation & Reasoning...');
+
+  // 4a. Live Copilot Chat: Asking Grounded Investigation Questions
   const chatTextarea = page.locator('textarea[placeholder*="Type incident report"]');
   if (await chatTextarea.isVisible().catch(() => false)) {
+    console.log('...Typing investigation query into AI Copilot...');
     await chatTextarea.scrollIntoViewIfNeeded();
     await typeHuman(
       chatTextarea,
-      'Analyze root cause for temperature excursion to 86.4°C on reactor CR-104 during Paracetamol crystallization.',
+      'What was the peak temperature reached on reactor CR-104 and which valve failed?',
       25
     );
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(500);
     const sendBtn = page.locator('button[title="Send to Copilot"]');
     if (await sendBtn.isVisible().catch(() => false)) {
       await sendBtn.click();
-      console.log('...Waiting for AI Copilot reasoning and field extraction...');
+      console.log('...Waiting for AI Copilot grounded response with citations...');
       await page.waitForTimeout(4000);
+    }
+
+    // 4b. Ask Follow-up Question for CAPA Guidance
+    if (await chatTextarea.isVisible().catch(() => false)) {
+      console.log('...Typing follow-up query for CAPA guidance...');
+      await typeHuman(
+        chatTextarea,
+        'What corrective action is recommended for the CV-104 cooling valve failure?',
+        25
+      );
+      await page.waitForTimeout(500);
+      if (await sendBtn.isVisible().catch(() => false)) {
+        await sendBtn.click();
+        console.log('...Waiting for AI Copilot CAPA synthesis...');
+        await page.waitForTimeout(4000);
+      }
     }
   }
 
-  // Tour Copilot Tabs (Intake, Gaps, RCA, Trace)
-  console.log('👉 [Scene 4] Touring Copilot capability tabs...');
-  const intakeTab = page.locator('div button:has-text("Intake")').first();
+  // 4c. Copilot Document Intake Tab (AI Extraction Workflow)
+  console.log('👉 [Scene 4c] Switching to Copilot Intake Tab (AI Document Extraction)...');
+  const intakeTab = page.locator('button:has-text("Intake")').first();
   if (await intakeTab.isVisible().catch(() => false)) {
     await intakeTab.click();
     await page.waitForTimeout(1500);
+
+    // Switch to Incident Text Mode
+    const textModeBtn = page.locator('button:has-text("Incident Text")').first();
+    if (await textModeBtn.isVisible().catch(() => false)) {
+      await textModeBtn.click();
+      await page.waitForTimeout(800);
+    }
+
+    // Click "Load Demo (DEV-2026-104)"
+    const loadDemoBtn = page.locator('button:has-text("Load Demo (DEV-2026-104)")').first();
+    if (await loadDemoBtn.isVisible().catch(() => false)) {
+      console.log('...Loading raw manufacturing deviation report into intake text box...');
+      await loadDemoBtn.click();
+      await page.waitForTimeout(1200);
+    }
+
+    // Click "Extract Structured Information via Groq"
+    const extractBtn = page.locator('button:has-text("Extract Structured Information via Groq")').first();
+    if (await extractBtn.isVisible().catch(() => false)) {
+      console.log('...Running LangGraph structured extraction via Groq...');
+      await extractBtn.click();
+      await page.waitForTimeout(5500);
+    }
+
+    // Review extracted fields and click Apply
+    const acceptAllBtn = page.locator('button:has-text("Select All")').first();
+    if (await acceptAllBtn.isVisible().catch(() => false)) {
+      await acceptAllBtn.click();
+      await page.waitForTimeout(800);
+    }
+
+    const applyFieldsBtn = page.locator('button:has-text("Apply")').filter({ hasText: /Approved Fields/i }).first();
+    if (await applyFieldsBtn.isVisible().catch(() => false)) {
+      console.log('...Applying AI-extracted fields to investigation form...');
+      await applyFieldsBtn.click();
+      await page.waitForTimeout(2000);
+    }
   }
 
-  const gapsTab = page.locator('div button:has-text("Gaps")').first();
+  // 4d. Copilot Evidence Gaps Tab
+  console.log('👉 [Scene 4d] Inspecting Copilot Evidence Gaps Tab...');
+  const gapsTab = page.locator('button:has-text("Gaps")').first();
   if (await gapsTab.isVisible().catch(() => false)) {
     await gapsTab.click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
   }
 
-  const rcaTab = page.locator('div button:has-text("RCA")').first();
+  // 4e. Copilot RCA Engine Tab (LangGraph Multi-Methodology Engine)
+  console.log('👉 [Scene 4e] Demonstrating LangGraph RCA Engine Tab...');
+  const rcaTab = page.locator('button:has-text("RCA")').first();
   if (await rcaTab.isVisible().catch(() => false)) {
     await rcaTab.click();
     await page.waitForTimeout(1500);
+
+    const genRcaBtn = page.locator('button:has-text("Generate Full RCA & CAPA Package")').first();
+    if (await genRcaBtn.isVisible().catch(() => false)) {
+      console.log('...Triggering LangGraph multi-methodology RCA Engine...');
+      await genRcaBtn.click();
+      await page.waitForTimeout(6000);
+    }
+
+    const applyAllRcaBtn = page.locator('button:has-text("Apply All Proposals")').first();
+    if (await applyAllRcaBtn.isVisible().catch(() => false)) {
+      await applyAllRcaBtn.click();
+      await page.waitForTimeout(1500);
+    }
   }
 
-  const traceTab = page.locator('div button:has-text("Trace")').first();
+  // 4f. Copilot Workflow Trace Tab (12 LangGraph StateGraph Nodes)
+  console.log('👉 [Scene 4f] Inspecting LangGraph Workflow Trace...');
+  const traceTab = page.locator('button:has-text("Trace")').first();
   if (await traceTab.isVisible().catch(() => false)) {
     await traceTab.click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2500);
   }
 
-  const chatTab = page.locator('div button:has-text("Chat")').first();
+  // Return to Chat tab
+  const chatTab = page.locator('button:has-text("Chat")').first();
   if (await chatTab.isVisible().catch(() => false)) {
     await chatTab.click();
     await page.waitForTimeout(1000);
   }
 
-  // ── Scene 5: Incident Intake & Deviation Parameters ────────────────────────
-  console.log('👉 [Scene 5] Reviewing Incident Intake & Deviation parameters...');
+  // ── Scene 5: Incident Intake & Deviation Parameters Form ───────────────────
+  console.log('👉 [Scene 5] Reviewing Incident Intake & Deviation parameters in center form...');
   const deviationSec = page.locator('#section-deviation');
   if (await deviationSec.isVisible().catch(() => false)) {
     await deviationSec.scrollIntoViewIfNeeded();
@@ -364,7 +440,7 @@ async function runAutoDemo() {
         SHOWCASE DEMO COMPLETE!
       </h2>
       <p style="font-size: 15px; color: #cbd5e1; margin-bottom: 22px; line-height: 1.5;">
-        All cGMP RCA capabilities demonstrated: 5 stages, AI reasoning, light/dark themes, role segregation, and 21 CFR Part 11 sign-off.
+        All cGMP RCA capabilities demonstrated: 5 stages, deep AI Copilot integration (Intake, Chat, Gaps, RCA, Trace), light/dark themes, role segregation, and 21 CFR Part 11 sign-off.
       </p>
       <div style="
         background: #dc2626;
